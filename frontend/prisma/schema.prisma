@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model Patient {
+  id        Int      @id @default(autoincrement())
+  name      String?
+  createdAt DateTime @default(now())
+  notes     Note[]
+}
+
+model Note {
+  id          Int      @id @default(autoincrement())
+  patientId   Int
+  patient     Patient  @relation(fields: [patientId], references: [id])
+  transcript  String   @db.Text
+  subjective  String   @db.Text
+  objective   String   @db.Text
+  assessment  String   @db.Text
+  plan        String   @db.Text
+  medications String   @db.Text
+  createdAt   DateTime @default(now())
+}
