@@ -1,8 +1,15 @@
 import { NextResponse } from 'next/server';
-import textToSpeech from '@google-cloud/text-to-speech';
+import { PollyClient, SynthesizeSpeechCommand } from '@aws-sdk/client-polly';
 
-// Create a client
-const client = new textToSpeech.TextToSpeechClient();
+// Create an AWS Polly client
+// Region and credentials are automatically picked up from process.env.AWS_REGION, etc. if available
+const pollyClient = new PollyClient({
+  region: process.env.AWS_REGION || 'us-east-1',
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  }
+});
 
 export async function POST(req) {
   try {
@@ -12,24 +19,28 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Text is required for TTS' }, { status: 400 });
     }
 
-    if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      console.warn("NO CREDENTIALS!! Returning empty TTS response.");
+    if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
+      console.warn("NO AWS CREDENTIALS!! Returning empty TTS response.");
       return NextResponse.json({ audioBase64: "" });
     }
 
-    const request = {
-      input: { text: text },
-      // Select the language and SSML voice gender (optional)
-      voice: { languageCode: 'en-US', name: 'en-US-Journey-F' },
-      // select the type of audio encoding
-      audioConfig: { audioEncoding: 'MP3' },
+    const params = {
+      Text: text,
+      OutputFormat: 'mp3',
+      VoiceId: 'Joanna', // or 'Matthew', etc.
+      Engine: 'neural' // use neural for better quality
     };
 
-    // Performs the text-to-speech request
-    const [response] = await client.synthesizeSpeech(request);
-    
-    // Return as base64 string
-    const audioBase64 = response.audioContent.toString('base64');
+    const command = new SynthesizeSpeechCommand(params);
+    const response = await pollyClient.send(command);
+
+    // Convert the AudioStream to a base64 string
+    const chunks = [];
+    for await (const chunk of response.AudioStream) {
+      chunks.push(chunk);
+    }
+    const audioBuffer = Buffer.concat(chunks);
+    const audioBase64 = audioBuffer.toString('base64');
 
     return NextResponse.json({
       audioBase64: audioBase64
