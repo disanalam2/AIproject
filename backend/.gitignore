@@ -1,0 +1,15 @@
+node_modules/
+.env
+.env.*
+*.log
+coverage/
+dist/
+build/
+.DS_Store
+
+# Prisma
+/prisma/*.db
+/prisma/*.db-journal
+
+# Google Cloud Service Account Keys
+google-credentials.json
