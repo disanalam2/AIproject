@@ -18,11 +18,17 @@ model Note {
   id               Int      @id @default(autoincrement())
   patientId        Int?     // Made optional for now so API can save without selecting patient
   patient          Patient? @relation(fields: [patientId], references: [id])
+  /// @encrypted
   transcript       String   @db.Text
+  /// @encrypted
   subjective       String?  @db.Text
+  /// @encrypted
   objective        String?  @db.Text
+  /// @encrypted
   assessment       String?  @db.Text
+  /// @encrypted
   lifestyle_advice String?  @db.Text
-  medications      Json?
+  /// @encrypted
+  medications      String?  @db.Text
   createdAt        DateTime @default(now())
 }

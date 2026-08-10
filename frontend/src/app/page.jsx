@@ -117,6 +117,21 @@ export default function App() {
     }
   };
 
+  const handleUpdateSummary = (newSummary) => {
+    setResult({ ...result, summary: newSummary });
+  };
+
+  const handleDiscard = () => {
+    setResult(null);
+    setTtsAudioUrl(null);
+    setPatientId("");
+    setSaveSuccess(false);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+    }
+  };
+
   return (
     <div className="min-h-screen text-slate-800 flex flex-col p-4 md:p-8 font-sans selection:bg-sky-200">
       
@@ -164,6 +179,7 @@ export default function App() {
             patientId={patientId}
             setPatientId={setPatientId}
             handleSave={handleSave}
+            handleDiscard={handleDiscard}
             isSaving={isSaving}
             saveSuccess={saveSuccess}
           />
@@ -196,7 +212,7 @@ export default function App() {
                 className="space-y-6"
               >
                 <TTSPlayerCard ttsAudioUrl={ttsAudioUrl} audioRef={audioRef} />
-                <SOAPNoteCard result={result} />
+                <SOAPNoteCard result={result} onUpdateSummary={handleUpdateSummary} />
 
                 {/* Raw Transcript */}
                 <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm">

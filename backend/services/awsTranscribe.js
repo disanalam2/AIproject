@@ -1,4 +1,4 @@
-import { TranscribeStreamingClient, StartMedicalStreamTranscriptionCommand } from "@aws-sdk/client-transcribe-streaming";
+import { TranscribeStreamingClient, StartStreamTranscriptionCommand } from "@aws-sdk/client-transcribe-streaming";
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -15,47 +15,46 @@ const transcribeClient = new TranscribeStreamingClient({
   }
 });
 
-async function convertAudioToPCMChunks(audioBuffer) {
-  return new Promise((resolve, reject) => {
-    const tmpDir = os.tmpdir();
-    const inputPath = path.join(tmpDir, `input-${Date.now()}.webm`);
-    const outputPath = path.join(tmpDir, `output-${Date.now()}.raw`);
-    
-    fs.writeFileSync(inputPath, audioBuffer);
+import { PassThrough } from 'stream';
 
-    ffmpeg(inputPath)
-      .audioFrequency(16000)
-      .audioChannels(1)
-      .audioFilter('highpass=f=200,lowpass=f=3000,afftdn') // Bandpass for voice freq + Noise reduction
-      .format('s16le')
-      .on('end', () => {
-        try {
-          const pcmBuffer = fs.readFileSync(outputPath);
-          console.log(`Audio converted! Input size: ${audioBuffer.length} bytes, Output PCM size: ${pcmBuffer.length} bytes`);
-          
-          // Cleanup
-          fs.unlinkSync(inputPath);
-          fs.unlinkSync(outputPath);
-          
-          // Create an async generator that yields chunks
-          async function* generateChunks() {
-            const chunkSize = 16000;
-            for (let i = 0; i < pcmBuffer.length; i += chunkSize) {
-              yield { AudioEvent: { AudioChunk: pcmBuffer.slice(i, i + chunkSize) } };
-            }
-          }
-          resolve(generateChunks());
-        } catch (e) {
-          reject(e);
-        }
-      })
-      .on('error', (err) => {
-        console.error("ffmpeg error", err);
-        try { fs.unlinkSync(inputPath); } catch (e) {}
-        reject(err);
-      })
-      .save(outputPath);
-  });
+async function convertAudioToPCMChunks(audioBuffer) {
+  const tmpDir = os.tmpdir();
+  const inputPath = path.join(tmpDir, `input-${Date.now()}.webm`);
+  
+  // Write the incoming webm to a temp file
+  fs.writeFileSync(inputPath, audioBuffer);
+
+  // We use a PassThrough stream to pipe FFmpeg directly to AWS Transcribe.
+  // highWaterMark of 16384 (16KB) creates optimal chunk sizes for AWS.
+  const passThrough = new PassThrough({ highWaterMark: 16384 });
+
+  ffmpeg(inputPath)
+    .inputOptions(['-fflags', '+genpts']) // Handle missing WebM timestamps
+    .audioFrequency(16000)
+    .audioChannels(1)
+    .format('s16le')
+    .on('start', (commandLine) => {
+      console.log('FFmpeg stream started processing audio...');
+    })
+    .on('error', (err) => {
+      console.error("FFmpeg error:", err);
+      passThrough.destroy(err); // IMPORTANT: Close stream on error to prevent infinite hanging
+      try { fs.unlinkSync(inputPath); } catch (e) {}
+    })
+    .on('end', () => {
+      console.log('FFmpeg stream finished processing audio.');
+      try { fs.unlinkSync(inputPath); } catch (e) {}
+    })
+    .pipe(passThrough);
+
+  // Convert the PassThrough stream to an Async Generator for AWS SDK
+  async function* generateChunks() {
+    for await (const chunk of passThrough) {
+      yield { AudioEvent: { AudioChunk: chunk } };
+    }
+  }
+
+  return generateChunks();
 }
 
 /**
@@ -73,12 +72,10 @@ export async function transcribeAudio(audioBuffer) {
   }
 
   try {
-    const command = new StartMedicalStreamTranscriptionCommand({
-      LanguageCode: "en-US",
+    const command = new StartStreamTranscriptionCommand({
+      LanguageCode: "hi-IN", // Perfectly handles Hindi and Indian English (Hinglish)
       MediaEncoding: "pcm",
       MediaSampleRateHertz: 16000,
-      Specialty: "PRIMARYCARE", // Tells AWS it's a medical transcript
-      Type: "CONVERSATION", // It's a doctor-patient conversation
       AudioStream: await convertAudioToPCMChunks(audioBuffer),
     });
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, CheckCircle2, Save } from 'lucide-react';
+import { User, CheckCircle2, Save, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function PatientAssignment({ 
@@ -8,6 +8,7 @@ export default function PatientAssignment({
   patientId, 
   setPatientId, 
   handleSave, 
+  handleDiscard,
   isSaving, 
   saveSuccess 
 }) {
@@ -35,23 +36,35 @@ export default function PatientAssignment({
               />
             </div>
             
-            <button
-              onClick={handleSave}
-              disabled={isSaving || saveSuccess}
-              className={`w-full py-3 px-4 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all ${
-                saveSuccess 
-                  ? "bg-emerald-50 text-emerald-600 border border-emerald-200" 
-                  : "bg-sky-500 hover:bg-sky-600 text-white shadow-md shadow-sky-500/20"
-              }`}
-            >
-              {saveSuccess ? (
-                <><CheckCircle2 className="w-5 h-5" /> Saved to EHR</>
-              ) : isSaving ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <><Save className="w-5 h-5" /> Approve & Save Note</>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={handleSave}
+                disabled={isSaving || saveSuccess}
+                className={`w-full py-3 px-4 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all ${
+                  saveSuccess 
+                    ? "bg-emerald-50 text-emerald-600 border border-emerald-200" 
+                    : "bg-sky-500 hover:bg-sky-600 text-white shadow-md shadow-sky-500/20"
+                }`}
+              >
+                {saveSuccess ? (
+                  <><CheckCircle2 className="w-5 h-5" /> Saved to EHR</>
+                ) : isSaving ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <><Save className="w-5 h-5" /> Approve & Save Note</>
+                )}
+              </button>
+              
+              {!saveSuccess && (
+                <button
+                  onClick={handleDiscard}
+                  disabled={isSaving}
+                  className="w-full py-2.5 px-4 rounded-xl font-semibold flex items-center justify-center gap-2 text-slate-500 hover:text-red-500 hover:bg-red-50 transition-all"
+                >
+                  <Trash2 className="w-4 h-4" /> Discard
+                </button>
               )}
-            </button>
+            </div>
           </div>
         </motion.div>
       )}

@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
@@ -41,7 +42,7 @@ app.post('/api/scribe', upload.single('audio'), async (req, res) => {
           objective: summaryJson.objective_symptoms || null,
           assessment: summaryJson.assessment || null,
           lifestyle_advice: summaryJson.lifestyle_advice || null,
-          medications: summaryJson.medications || null, 
+          medications: summaryJson.medications ? JSON.stringify(summaryJson.medications) : null,
         }
       });
       console.log("Saved to database successfully via Prisma.");
@@ -98,7 +99,7 @@ app.post('/api/notes/save', async (req, res) => {
         objective: summary.objective_symptoms || null,
         assessment: summary.assessment || null,
         lifestyle_advice: summary.lifestyle_advice || null,
-        medications: summary.medications || null,
+        medications: summary.medications ? JSON.stringify(summary.medications) : null,
       }
     });
 
