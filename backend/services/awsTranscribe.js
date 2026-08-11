@@ -29,7 +29,7 @@ async function convertAudioToPCMChunks(audioBuffer) {
   const passThrough = new PassThrough({ highWaterMark: 16384 });
 
   ffmpeg(inputPath)
-    .inputOptions(['-fflags', '+genpts']) // Handle missing WebM timestamps
+    .inputOptions(['-re', '-fflags', '+genpts']) // '-re' forces real-time streaming, preventing AWS Transcribe from choking on instant data bursts
     .audioFrequency(16000)
     .audioChannels(1)
     .format('s16le')
