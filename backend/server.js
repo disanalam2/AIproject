@@ -4,7 +4,7 @@ import cors from 'cors';
 import multer from 'multer';
 import { transcribeAudio } from './services/awsTranscribe.js';
 import { synthesizeSpeech } from './services/awsPolly.js';
-import { summarizeTranscript } from './services/awsBedrockSummarizer.js';
+import { summarizeTranscript } from './services/groqSummarizer.js';
 import { extractICD10Codes } from './services/awsComprehendMedical.js';
 import prisma from './db/prismaClient.js';
 import { execSync } from 'child_process';
