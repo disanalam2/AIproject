@@ -30,15 +30,16 @@ export async function summarizeTranscript(transcript, searchKeywords = null) {
   const prompt = `
     You are an expert medical AI scribe. Read this clinical conversation transcript and strictly format it into a professional JSON SOAP note.
     
-    ${medicalContext ? `MEDICAL TEXTBOOK CONTEXT:\nUse the following excerpts from standard medical textbooks to improve clinical accuracy, terminology, and standard practices in your notes:\n${medicalContext}\n\n` : ''}
+    ${medicalContext ? `MEDICAL TEXTBOOK CONTEXT:\nUse the following excerpts from standard medical textbooks ONLY for reference to spell medical terms correctly or understand standard practices. DO NOT invent or assume the patient has any of the symptoms or conditions mentioned in this textbook context unless they are EXPLICITLY stated in the transcript.\n${medicalContext}\n\n` : ''}
     Crucial Requirements:
+    - ANTI-HALLUCINATION: YOU MUST NOT invent any symptoms, diagnoses, or medications. If the transcript is very short or cut off, output "None" for the respective fields. ONLY use information explicitly spoken in the transcript.
     - IGNORE NOISE: The transcript may contain background noise, side chatter, or irrelevant conversation. Act as a noise filter and ignore anything not related to the clinical consultation.
     - If the transcript is in a language other than English (e.g. Hindi, Hinglish, Spanish), accurately translate it into English first.
     - ALL OUTPUT MUST BE IN ENGLISH.
     - Use standard clinical format and terminology.
     - Accurately capture all relative medical terms, diagnoses, dosages, frequencies, and anatomical locations.
     - Keys MUST be exactly: "subjective_complaints", "objective_symptoms", "assessment", "lifestyle_advice", "medications".
-    - "medications" must be an array of strings (e.g., ["Ibuprofen 400mg PO TID"]).
+    - "medications" must be an array of strings (e.g., ["Ibuprofen 400mg PO TID"]). If no medications, return [].
     - DO NOT USE MARKDOWN CODE BLOCKS (\`\`\`json). Output raw json only.
 
     Transcript: ${transcript}
