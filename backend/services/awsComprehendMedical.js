@@ -51,7 +51,6 @@ export async function extractICD10Codes(text) {
     return codes;
   } catch (error) {
     console.error("Comprehend Medical Error:", error);
-    // Don't crash the whole scribe API if just billing codes fail
-    return [{ error: "Failed to extract billing codes" }];
+    return [];
   }
 }
