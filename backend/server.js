@@ -4,7 +4,8 @@ import cors from 'cors';
 import multer from 'multer';
 import { transcribeAudio } from './services/awsTranscribe.js';
 import { synthesizeSpeech } from './services/awsPolly.js';
-import { summarizeTranscript } from './services/geminiSummarizer.js';
+import { summarizeTranscript } from './services/awsBedrockSummarizer.js';
+import { extractICD10Codes } from './services/awsComprehendMedical.js';
 import prisma from './db/prismaClient.js';
 import { execSync } from 'child_process';
 
@@ -29,10 +30,20 @@ app.post('/api/scribe', upload.single('audio'), async (req, res) => {
     // 1. STT with AWS Transcribe
     const transcript = await transcribeAudio(req.file.buffer);
 
-    // 2. Summarize with Google Gemini
-    const summaryJson = await summarizeTranscript(transcript);
+    // 2. Extract Medical Entities with AWS Comprehend Medical FIRST
+    const billingCodes = await extractICD10Codes(transcript);
+    
+    // Create a search query for RAG from the extracted medical conditions
+    let searchKeywords = null;
+    if (billingCodes && billingCodes.length > 0) {
+      searchKeywords = billingCodes.map(bc => bc.condition).join(" ");
+      console.log("Smart RAG: Using keywords for search:", searchKeywords);
+    }
 
-    // 3. Save to database using Prisma
+    // 3. Summarize with AWS Bedrock, passing the smart keywords
+    const summaryJson = await summarizeTranscript(transcript, searchKeywords);
+
+    // 4. Save to database using Prisma
     console.log("Saving to database...");
     try {
       await prisma.note.create({
@@ -43,6 +54,7 @@ app.post('/api/scribe', upload.single('audio'), async (req, res) => {
           assessment: summaryJson.assessment || null,
           lifestyle_advice: summaryJson.lifestyle_advice || null,
           medications: summaryJson.medications ? JSON.stringify(summaryJson.medications) : null,
+          billing_codes: billingCodes && billingCodes.length > 0 ? JSON.stringify(billingCodes) : null,
         }
       });
       console.log("Saved to database successfully via Prisma.");
@@ -52,7 +64,8 @@ app.post('/api/scribe', upload.single('audio'), async (req, res) => {
   
     res.json({
       transcript: transcript,
-      summary: summaryJson
+      summary: summaryJson,
+      billing_codes: billingCodes
     });
 
   } catch (error) {
@@ -83,7 +96,7 @@ app.post('/api/tts', async (req, res) => {
 
 app.post('/api/notes/save', async (req, res) => {
   try {
-    const { patientId, transcript, summary } = req.body;
+    const { patientId, transcript, summary, billing_codes } = req.body;
     
     if (!patientId) {
       return res.status(400).json({ error: 'Patient ID is required' });
@@ -100,6 +113,7 @@ app.post('/api/notes/save', async (req, res) => {
         assessment: summary.assessment || null,
         lifestyle_advice: summary.lifestyle_advice || null,
         medications: summary.medications ? JSON.stringify(summary.medications) : null,
+        billing_codes: billing_codes ? JSON.stringify(billing_codes) : null,
       }
     });
 

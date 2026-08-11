@@ -10,6 +10,8 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1107.0",
+    "@aws-sdk/client-comprehendmedical": "^3.1107.0",
     "@aws-sdk/client-polly": "^3.0.0",
     "@aws-sdk/client-transcribe-streaming": "^3.0.0",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",

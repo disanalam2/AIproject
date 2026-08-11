@@ -39,7 +39,7 @@ export default function AudioCapture({ isProcessing, handleAudio, audioRef }) {
           <div className="relative bg-white border border-slate-200 p-2 rounded-full shadow-sm transform hover:scale-105 transition-transform duration-300">
             <AudioRecorder
               onRecordingComplete={handleAudio}
-              audioTrackConstraints={{ noiseSuppression: true, echoCancellation: true }}
+              audioTrackConstraints={{ noiseSuppression: true, echoCancellation: true, autoGainControl: true }}
               downloadOnSavePress={false}
               classes={{
                 AudioRecorderClass: "scribe-recorder",

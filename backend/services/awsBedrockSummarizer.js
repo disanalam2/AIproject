@@ -1,16 +1,25 @@
+import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
 import { retrieveMedicalContext } from './ragService.js';
 
+const client = new BedrockRuntimeClient({
+  region: process.env.AWS_REGION || 'us-east-1',
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  }
+});
+
 /**
- * Summarizes clinical transcripts into SOAP notes using Google Gemini
+ * Summarizes clinical transcripts into SOAP notes using Amazon Bedrock (Claude 3.5 Sonnet)
  * @param {string} transcript - The raw clinical transcript
+ * @param {string} [searchKeywords=null] - Keywords for RAG context search
  * @returns {Promise<Object>} The structured SOAP note in JSON
  */
-export async function summarizeTranscript(transcript) {
-  console.log("Calling Google Gemini via fetch...");
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
+export async function summarizeTranscript(transcript, searchKeywords = null) {
+  console.log("Calling AWS Bedrock (Claude 3.5 Sonnet)...");
   
-  if (!apiKey) {
-    console.warn("no GEMINI API credentials. mocking response.");
+  if (!process.env.AWS_ACCESS_KEY_ID) {
+    console.warn("no AWS credentials. mocking response.");
     return {
       subjective_complaints: "Severe headache.",
       objective_symptoms: "Patient looks tired.",
@@ -20,7 +29,7 @@ export async function summarizeTranscript(transcript) {
     };
   }
 
-  const medicalContext = await retrieveMedicalContext(transcript);
+  const medicalContext = await retrieveMedicalContext(searchKeywords || transcript);
 
   const prompt = `
     You are an expert medical AI scribe. Read this clinical conversation transcript and strictly format it into a professional JSON SOAP note.
@@ -40,25 +49,34 @@ export async function summarizeTranscript(transcript) {
   `;
 
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`, {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey
-      },
+    const command = new InvokeModelCommand({
+      modelId: "anthropic.claude-3-5-sonnet-20240620-v1:0",
+      contentType: "application/json",
+      accept: "application/json",
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0, responseMimeType: "application/json" }
-      })
+        anthropic_version: "bedrock-2023-05-31",
+        max_tokens: 2000,
+        temperature: 0,
+        messages: [
+          {
+            role: "user",
+            content: prompt
+          }
+        ]
+      }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Gemini API Error: ${response.status} ${errorText}`);
-    }
-
-    const data = await response.json();
-    const rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    const response = await client.send(command);
+    
+    // The response body is a Uint8Array. We need to decode it.
+    const decodedResponseBody = new TextDecoder().decode(response.body);
+    const responseBody = JSON.parse(decodedResponseBody);
+    
+    // Claude typically puts the text in content[0].text
+    let rawContent = responseBody.content?.[0]?.text || "{}";
+    
+    // If Claude wrapped it in markdown code blocks by accident, clean it up
+    rawContent = rawContent.replace(/^\`\`\`json\s*/g, '').replace(/\s*\`\`\`$/g, '');
 
     try {
       return JSON.parse(rawContent);
@@ -67,7 +85,7 @@ export async function summarizeTranscript(transcript) {
       return { error: "Failed to parse AI output" };
     }
   } catch (error) {
-    console.error("Gemini Summarization Error:", error);
+    console.error("Bedrock Summarization Error:", error);
     throw new Error(`Failed to summarize transcript: ${error.message}`);
   }
 }
