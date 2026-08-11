@@ -33,13 +33,6 @@ async function convertAudioToPCMChunks(audioBuffer) {
     .audioFrequency(16000)
     .audioChannels(1)
     .format('s16le')
-    .audioFilters([
-      'afftdn=nf=-25', // AI-like Noise reduction (Fast Fourier Transform), removes hums/fans
-      'highpass=f=200', // Removes extremely low frequencies (wind, rumble)
-      'lowpass=f=3000', // Removes extremely high frequencies (hiss)
-      'dynaudnorm',     // Dynamic volume normalization (balances quiet/loud speech)
-      'silenceremove=stop_periods=-1:stop_duration=1.5:stop_threshold=-35dB' // Removes silences > 1.5s to save AWS costs & increase accuracy
-    ])
     .on('start', (commandLine) => {
       console.log('FFmpeg stream started processing audio...');
     })
