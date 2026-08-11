@@ -81,6 +81,8 @@ export async function transcribeAudio(audioBuffer) {
 
     const response = await transcribeClient.send(command);
 
+    let partialTranscript = "";
+
     for await (const event of response.TranscriptResultStream) {
       if (event.TranscriptEvent) {
         const results = event.TranscriptEvent.Transcript.Results;
@@ -88,10 +90,19 @@ export async function transcribeAudio(audioBuffer) {
           for (const result of results) {
             if (!result.IsPartial) {
               transcript += result.Alternatives[0].Transcript + " ";
+              partialTranscript = ""; // Clear partial once committed
+            } else {
+              // Keep tracking the latest uncommitted partial text
+              partialTranscript = result.Alternatives[0].Transcript;
             }
           }
         }
       }
+    }
+    
+    // If the stream ended abruptly, the last few words might still be stuck as 'partial'. Append them!
+    if (partialTranscript) {
+      transcript += partialTranscript + " ";
     }
     
     transcript = transcript.trim();
