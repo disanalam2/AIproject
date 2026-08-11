@@ -52,7 +52,7 @@ export async function summarizeTranscript(transcript, searchKeywords = null) {
           content: prompt
         }
       ],
-      model: "llama3-70b-8192", // We can use Llama-3-70b for high reasoning
+      model: "llama-3.3-70b-versatile", // Upgraded to latest supported Llama 3.3 model
       temperature: 0,
       response_format: { type: "json_object" } // Force JSON output natively!
     });
