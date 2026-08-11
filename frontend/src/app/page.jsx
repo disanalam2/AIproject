@@ -37,7 +37,15 @@ export default function App() {
       const data = await response.json();
       
       if (!response.ok) {
-        alert(data.error || "Something broke");
+        alert(data.error || "Something broke. Click OK to download your recording manually as a backup.");
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.style.display = "none";
+        a.href = url;
+        a.download = `recording-backup-${Date.now()}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(url);
         setIsProcessing(false);
         return;
       }
@@ -51,7 +59,15 @@ export default function App() {
 
     } catch (err) {
       console.error(err);
-      alert("Error contacting API. Check console.");
+      alert("Error contacting API. We are downloading your recording as a backup.");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.style.display = "none";
+      a.href = url;
+      a.download = `recording-backup-error-${Date.now()}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
     } finally {
       setIsProcessing(false);
     }

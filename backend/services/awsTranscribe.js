@@ -13,10 +13,10 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
  * Transcribes audio using Groq's blazing fast Whisper Large V3 API
  * This replaces AWS Transcribe Streaming because AWS Streaming is not designed 
  * for fast synchronous file uploads and fails on long (1-hour) conversations.
- * @param {Buffer} audioBuffer - The audio file buffer
+ * @param {string} inputPath - The path to the uploaded audio file
  * @returns {Promise<string>} The transcript
  */
-export async function transcribeAudio(audioBuffer) {
+export async function transcribeAudio(inputPath) {
   console.log("Calling Groq Whisper API for transcription...");
   
   if (!process.env.GROQ_API_KEY) {
@@ -25,14 +25,10 @@ export async function transcribeAudio(audioBuffer) {
   }
 
   const tmpDir = os.tmpdir();
-  const inputPath = path.join(tmpDir, `input-${Date.now()}.webm`);
   const outputPath = path.join(tmpDir, `output-${Date.now()}.mp3`); // Whisper loves mp3
   
   try {
-    // 1. Write the incoming webm to a temp file
-    fs.writeFileSync(inputPath, audioBuffer);
-
-    // 2. Compress and convert audio to mp3 (solves 25MB limits for 1hr audio)
+    // 1. Compress and convert audio to mp3 (solves 25MB limits for 1hr audio)
     await new Promise((resolve, reject) => {
       ffmpeg(inputPath)
         .audioChannels(1)

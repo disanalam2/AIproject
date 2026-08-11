@@ -15,8 +15,20 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// Set up multer for audio upload in memory
-const storage = multer.memoryStorage();
+// Set up multer for audio upload to disk (fixes OOM for large files)
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dir = os.tmpdir();
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    cb(null, `upload-${Date.now()}-${file.originalname}`);
+  }
+});
 const upload = multer({ storage: storage });
 
 app.post('/api/scribe', upload.single('audio'), async (req, res) => {
@@ -27,8 +39,8 @@ app.post('/api/scribe', upload.single('audio'), async (req, res) => {
       return res.status(400).json({ error: 'No audio provided' });
     }
 
-    // 1. STT with AWS Transcribe
-    const transcript = await transcribeAudio(req.file.buffer);
+    // 1. STT with AWS Transcribe (now using file path)
+    const transcript = await transcribeAudio(req.file.path);
 
     // 2. Extract Medical Entities with AWS Comprehend Medical FIRST
     const billingCodes = await extractICD10Codes(transcript);

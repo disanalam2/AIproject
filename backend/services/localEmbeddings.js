@@ -25,7 +25,7 @@ export class LocalEmbeddings {
 
   async embedQuery(text) {
     await this.init();
-    const output = await this.extractor(text, { pooling: 'mean', normalize: true });
+    const output = await this.extractor(text, { pooling: 'mean', normalize: true, truncation: true });
     return Array.from(output.data);
   }
 }

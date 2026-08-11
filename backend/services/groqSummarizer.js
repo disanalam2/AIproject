@@ -25,7 +25,9 @@ export async function summarizeTranscript(transcript, searchKeywords = null) {
     };
   }
 
-  const medicalContext = await retrieveMedicalContext(searchKeywords || transcript);
+  // If no keywords found, fallback to the first 500 chars to avoid crashing the local embedding model
+  const ragQuery = searchKeywords || transcript.substring(0, 500);
+  const medicalContext = await retrieveMedicalContext(ragQuery);
 
   const prompt = `
     You are an expert medical AI scribe. Read this clinical conversation transcript and strictly format it into a professional JSON SOAP note.
