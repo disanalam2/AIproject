@@ -10,13 +10,13 @@ const client = new BedrockRuntimeClient({
 });
 
 /**
- * Summarizes clinical transcripts into SOAP notes using Amazon Bedrock (Claude 3.5 Sonnet)
+ * Summarizes clinical transcripts into SOAP notes using Amazon Bedrock (Claude 3 Haiku)
  * @param {string} transcript - The raw clinical transcript
  * @param {string} [searchKeywords=null] - Keywords for RAG context search
  * @returns {Promise<Object>} The structured SOAP note in JSON
  */
 export async function summarizeTranscript(transcript, searchKeywords = null) {
-  console.log("Calling AWS Bedrock (Claude 3.5 Sonnet)...");
+  console.log("Calling AWS Bedrock (Claude 3 Haiku)...");
   
   if (!process.env.AWS_ACCESS_KEY_ID) {
     console.warn("no AWS credentials. mocking response.");
