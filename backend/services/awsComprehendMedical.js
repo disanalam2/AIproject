@@ -21,6 +21,11 @@ export async function extractICD10Codes(text) {
     return [];
   }
 
+  if (!text || text.trim() === "") {
+    console.warn("Text is empty, skipping Comprehend Medical.");
+    return [];
+  }
+
   try {
     const command = new InferICD10CMCommand({
       Text: text.substring(0, 10000) // Comprehend Medical has a 10,000 char limit
