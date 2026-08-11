@@ -20,39 +20,39 @@ import { PassThrough } from 'stream';
 async function convertAudioToPCMChunks(audioBuffer) {
   const tmpDir = os.tmpdir();
   const inputPath = path.join(tmpDir, `input-${Date.now()}.webm`);
+  const outputPath = path.join(tmpDir, `output-${Date.now()}.pcm`);
   
   // Write the incoming webm to a temp file
   fs.writeFileSync(inputPath, audioBuffer);
 
-  // We use a PassThrough stream to pipe FFmpeg directly to AWS Transcribe.
-  // highWaterMark of 16384 (16KB) creates optimal chunk sizes for AWS.
-  const passThrough = new PassThrough({ highWaterMark: 16384 });
+  // 1. Fully convert the audio to a PCM file first to avoid pipe/stream corruption
+  await new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .audioFrequency(16000)
+      .audioChannels(1)
+      .format('s16le')
+      .audioFilters(['dynaudnorm']) // Boost quiet mics
+      .on('end', resolve)
+      .on('error', reject)
+      .save(outputPath);
+  });
 
-  ffmpeg(inputPath)
-    .inputOptions(['-re', '-fflags', '+genpts']) // '-re' forces real-time streaming, preventing AWS Transcribe from choking on instant data bursts
-    .audioFrequency(16000)
-    .audioChannels(1)
-    .format('s16le')
-    .audioFilters(['dynaudnorm']) // Boost quiet mics automatically so AWS can hear the speech
-    .on('start', (commandLine) => {
-      console.log('FFmpeg stream started processing audio...');
-    })
-    .on('error', (err) => {
-      console.error("FFmpeg error:", err);
-      passThrough.destroy(err); // IMPORTANT: Close stream on error to prevent infinite hanging
-      try { fs.unlinkSync(inputPath); } catch (e) {}
-    })
-    .on('end', () => {
-      console.log('FFmpeg stream finished processing audio.');
-      try { fs.unlinkSync(inputPath); } catch (e) {}
-    })
-    .pipe(passThrough);
+  // 2. Read the fully converted PCM file
+  // 16kHz 16-bit PCM = 32,000 bytes per second. 
+  // 16384 bytes is roughly 0.5 seconds of audio.
+  const fileStream = fs.createReadStream(outputPath, { highWaterMark: 16384 });
 
-  // Convert the PassThrough stream to an Async Generator for AWS SDK
+  // 3. Convert to an Async Generator for AWS SDK
   async function* generateChunks() {
-    for await (const chunk of passThrough) {
+    for await (const chunk of fileStream) {
       yield { AudioEvent: { AudioChunk: chunk } };
+      // Throttle the stream to ~5x real-time (100ms per 0.5s of audio) 
+      // This prevents AWS from choking on instant data bursts while still being fast.
+      await new Promise(r => setTimeout(r, 100));
     }
+    // Cleanup temp files after stream finishes
+    try { fs.unlinkSync(inputPath); } catch (e) {}
+    try { fs.unlinkSync(outputPath); } catch (e) {}
   }
 
   return generateChunks();
