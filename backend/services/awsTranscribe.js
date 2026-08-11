@@ -33,6 +33,7 @@ async function convertAudioToPCMChunks(audioBuffer) {
     .audioFrequency(16000)
     .audioChannels(1)
     .format('s16le')
+    .audioFilters(['dynaudnorm']) // Boost quiet mics automatically so AWS can hear the speech
     .on('start', (commandLine) => {
       console.log('FFmpeg stream started processing audio...');
     })
