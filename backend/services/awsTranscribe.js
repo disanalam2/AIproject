@@ -47,9 +47,14 @@ async function convertAudioToPCMChunks(audioBuffer) {
     for await (const chunk of fileStream) {
       yield { AudioEvent: { AudioChunk: chunk } };
       // Throttle the stream to ~5x real-time (100ms per 0.5s of audio) 
-      // This prevents AWS from choking on instant data bursts while still being fast.
       await new Promise(r => setTimeout(r, 100));
     }
+    
+    // CRITICAL FIX: Keep the stream open for 3 extra seconds after sending the last chunk!
+    // AWS Transcribe needs time to process the final chunks. If we exit this generator instantly,
+    // the SDK closes the connection and AWS never sends the final words.
+    await new Promise(r => setTimeout(r, 3000));
+
     // Cleanup temp files after stream finishes
     try { fs.unlinkSync(inputPath); } catch (e) {}
     try { fs.unlinkSync(outputPath); } catch (e) {}
