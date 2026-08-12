@@ -34,3 +34,12 @@ model Note {
   billing_codes    String?  @db.Text
   createdAt        DateTime @default(now())
 }
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  action     String
+  entityType String
+  entityId   Int?
+  details    String?  @db.Text
+  createdAt  DateTime @default(now())
+}

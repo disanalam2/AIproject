@@ -58,7 +58,7 @@ app.post('/api/scribe', upload.single('audio'), async (req, res) => {
     // 4. Save to database using Prisma
     console.log("Saving to database...");
     try {
-      await prisma.note.create({
+      const note = await prisma.note.create({
         data: {
           transcript: transcript,
           subjective: summaryJson.subjective_complaints || null,
@@ -70,6 +70,15 @@ app.post('/api/scribe', upload.single('audio'), async (req, res) => {
         }
       });
       console.log("Saved to database successfully via Prisma.");
+      
+      await prisma.auditLog.create({
+        data: {
+          action: "NOTE_GENERATED",
+          entityType: "Note",
+          entityId: note.id,
+          details: JSON.stringify({ action: "Generated from audio upload" })
+        }
+      });
     } catch (dbError) {
       console.error("Prisma Database Error:", dbError);
     }
@@ -126,6 +135,15 @@ app.post('/api/notes/save', async (req, res) => {
         lifestyle_advice: summary.lifestyle_advice || null,
         medications: summary.medications ? JSON.stringify(summary.medications) : null,
         billing_codes: billing_codes ? JSON.stringify(billing_codes) : null,
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: "NOTE_SAVED",
+        entityType: "Note",
+        entityId: note.id,
+        details: JSON.stringify({ patientId: patientId })
       }
     });
 
