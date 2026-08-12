@@ -43,8 +43,7 @@ export async function transcribeAudio(inputPath) {
     const transcription = await groq.audio.transcriptions.create({
       file: fs.createReadStream(outputPath),
       model: "whisper-large-v3-turbo", // turbo is faster and highly accurate for Indian English/Hindi
-      response_format: "verbose_json",
-      language: "hi", // Specify Hindi for Hinglish support
+      response_format: "verbose_json"
     });
 
     const transcriptText = transcription.text.trim();
