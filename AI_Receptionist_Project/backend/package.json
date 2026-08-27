@@ -1,0 +1,34 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@aws-sdk/client-comprehendmedical": "^3.1113.0",
+    "@aws-sdk/client-polly": "^3.1113.0",
+    "@aws-sdk/client-transcribe-streaming": "^3.1113.0",
+    "@langchain/core": "^0.2.33",
+    "@langchain/groq": "^0.0.17",
+    "@prisma/client": "^5.22.0",
+    "aws-sdk": "^2.1693.0",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "groq-sdk": "^1.5.0",
+    "jsonwebtoken": "^9.0.3",
+    "langchain": "^0.2.20",
+    "prisma": "^5.22.0",
+    "prisma-field-encryption": "^1.6.0",
+    "ws": "^8.21.3"
+  }
+}
