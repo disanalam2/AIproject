@@ -26,7 +26,7 @@ app.post('/api/lex-webhook', async (req, res) => {
         const intentName = intent.name || "Unknown";
 
         // 1. Process transcript dynamically via LangChain Agent
-        const llmResponse = await llmService.processIntent(inputTranscript, intentName);
+        const llmResponse = await llmService.processIntent(sessionId, inputTranscript, intentName);
 
         // 2. Log the call
         const logEntry = await prisma.callLog.create({
@@ -58,6 +58,48 @@ app.post('/api/lex-webhook', async (req, res) => {
         });
     } catch (error) {
         console.error("Webhook Error:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+
+// Webhook for Google Dialogflow CX/ES
+app.post('/api/dialogflow-webhook', async (req, res) => {
+    try {
+        console.log("Received event from Dialogflow:", JSON.stringify(req.body, null, 2));
+        
+        // Dialogflow formats its requests differently.
+        const inputTranscript = req.body.queryResult?.queryText || "";
+        const intentName = req.body.queryResult?.intent?.displayName || "Unknown";
+        const sessionId = req.body.session || "Unknown";
+
+        // 1. Process transcript dynamically via LangChain Agent
+        const llmResponse = await llmService.processIntent(sessionId, inputTranscript, intentName);
+
+        // 2. Log the call
+        const logEntry = await prisma.callLog.create({
+            data: {
+                phoneNumber: sessionId,
+                transcript: inputTranscript,
+                intent: intentName,
+            }
+        });
+
+        // 3. Sync to Google Sheets for Human Review
+        const sheetsIntegration = require('./services/sheetsIntegration');
+        await sheetsIntegration.appendToGoogleSheet(logEntry);
+
+        // 4. Return Dialogflow formatted response
+        res.json({
+            fulfillmentMessages: [
+                {
+                    text: {
+                        text: [llmResponse || "I have processed your request."]
+                    }
+                }
+            ]
+        });
+    } catch (error) {
+        console.error("Dialogflow Webhook Error:", error);
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
@@ -157,19 +199,78 @@ app.post('/api/settings', authMiddleware, async (req, res) => {
     }
 });
 
-// Chime Meeting stub
+// Telephony Branching Routing
+app.post('/api/telephony/connect', async (req, res) => {
+    try {
+        const config = await configService.getConfiguration();
+        const activeTelephony = config.active_telephony || 'chime';
+
+        if (activeTelephony === 'twilio') {
+            const VoiceResponse = require('twilio').twiml.VoiceResponse;
+            const twiml = new VoiceResponse();
+            twiml.say({ voice: 'Polly.Joanna', language: 'en-US' }, 'Welcome to City Care. Please wait while we connect you to our medical AI assistant.');
+            twiml.connect().stream({ url: 'wss://' + req.headers.host + '/api/telephony/stream' });
+            res.type('text/xml');
+            res.send(twiml.toString());
+        } else if (activeTelephony === 'vapi') {
+            // Vapi.ai expects a specific JSON payload for webhooks to route calls
+            res.json({ 
+                message: "Vapi connection instructions",
+                assistantId: process.env.VAPI_ASSISTANT_ID || "mock-vapi-assistant",
+                destination: { type: "sip", sipUri: "sip:vapi@sip.vapi.ai" }
+            });
+        } else if (activeTelephony === 'retell') {
+            res.json({ 
+                message: "Retell AI connection instructions", 
+                agentId: process.env.RETELL_AGENT_ID || "mock-retell-agent",
+                action: "connect"
+            });
+        } else if (activeTelephony === 'bland') {
+            res.json({ 
+                message: "Bland AI connection instructions", 
+                voice_id: process.env.BLAND_VOICE_ID || "mock-bland-voice",
+                transfer_to: "+1234567890"
+            });
+        } else if (activeTelephony === 'google') {
+            // Google Voice via Dialogflow Phone Gateway typically routes automatically 
+            // once connected, but here is a mock payload for custom SIP trunks:
+            res.json({ 
+                message: "Google Voice Gateway connection",
+                sipUri: "sip:google@voice.google.com"
+            });
+        } else {
+            // Default Chime behavior would normally redirect to the /api/chime/meeting route
+            res.json({ message: "Chime SDK connection should use /api/chime/meeting" });
+        }
+    } catch (error) {
+        console.error("Telephony routing error:", error);
+        res.status(500).json({ error: "Failed to route telephony" });
+    }
+});
+
+// Chime Meeting implementation
+const { ChimeSDKMeetingsClient, CreateMeetingCommand, CreateAttendeeCommand } = require('@aws-sdk/client-chime-sdk-meetings');
+const chimeClient = new ChimeSDKMeetingsClient({ region: process.env.AWS_REGION || 'us-east-1' });
+
 app.post('/api/chime/meeting', async (req, res) => {
     try {
-        // Normally, you would use AWS SDK Chime client to create a meeting and attendee:
-        // const meeting = await chime.createMeeting(...).promise();
-        // const attendee = await chime.createAttendee(...).promise();
+        const meetingResponse = await chimeClient.send(new CreateMeetingCommand({
+            ClientRequestToken: Math.random().toString(36).substring(2),
+            MediaRegion: process.env.AWS_REGION || 'us-east-1',
+            ExternalMeetingId: `CityCare-${Date.now()}`
+        }));
         
-        // Returning a mock response for now to allow UI to flow without crashing
+        const attendeeResponse = await chimeClient.send(new CreateAttendeeCommand({
+            MeetingId: meetingResponse.Meeting.MeetingId,
+            ExternalUserId: `Patient-${Date.now()}`
+        }));
+
         res.json({
-            Meeting: { MeetingId: "mock-meeting-id" },
-            Attendee: { AttendeeId: "mock-attendee-id", JoinToken: "mock-token" }
+            Meeting: meetingResponse.Meeting,
+            Attendee: attendeeResponse.Attendee
         });
     } catch (error) {
+        console.error("Failed to create Chime meeting:", error);
         res.status(500).json({ error: "Failed to create meeting" });
     }
 });

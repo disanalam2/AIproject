@@ -2,7 +2,7 @@ const groqService = require('./groqService');
 const configService = require('./configService');
 const langchainAgent = require('./langchainAgent');
 
-async function processIntent(transcript, intentName) {
+async function processIntent(sessionId, transcript, intentName) {
     // 1. Fetch active LLM provider from config
     const config = await configService.getConfiguration();
     const activeLLM = config.active_llm || 'groq';
@@ -11,17 +11,17 @@ async function processIntent(transcript, intentName) {
     switch (activeLLM) {
         case 'groq':
             console.log(`[LLM Router] Routing to LangChain Agent with Groq...`);
-            return await langchainAgent.runAgent(transcript, intentName);
+            return await langchainAgent.runAgent(sessionId, transcript, intentName);
         
         case 'openai':
         case 'bedrock':
         case 'gemini':
-            console.log(`[LLM Router] ${activeLLM} selected but not fully implemented. Falling back to LangChain Groq Agent.`);
-            return await langchainAgent.runAgent(transcript, intentName);
+            console.log(`[LLM Router] Routing to LangChain Agent with ${activeLLM}...`);
+            return await langchainAgent.runAgent(sessionId, transcript, intentName);
             
         default:
             console.warn(`[LLM Router] Unknown provider ${activeLLM}. Using LangChain Groq Agent.`);
-            return await langchainAgent.runAgent(transcript, intentName);
+            return await langchainAgent.runAgent(sessionId, transcript, intentName);
     }
 }
 

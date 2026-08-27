@@ -3,11 +3,16 @@ const { AgentExecutor, createToolCallingAgent } = require("langchain/agents");
 const { ChatPromptTemplate } = require("@langchain/core/prompts");
 const { tool } = require("@langchain/core/tools");
 const { z } = require("zod");
-const { extractMedicalEntities } = require("./awsService");
+const { extractMedicalEntities } = require("./nlpService");
 const prisma = require("../prismaClient");
 const configService = require("./configService");
 const calendarService = require("./calendarService");
 const notificationService = require("./notificationService");
+const { HumanMessage, AIMessage } = require("@langchain/core/messages");
+const { MessagesPlaceholder } = require("@langchain/core/prompts");
+
+// In-memory store for session conversation history
+const sessionMemoryStore = new Map();
 
 // Define Tools
 const extractSymptomsTool = tool(
@@ -163,17 +168,57 @@ const tools = [
 ];
 
 async function initializeAgent() {
-    const groqApiKey = await configService.getSecret("GROQ_API_KEY") || process.env.GROQ_API_KEY;
+    const config = await configService.getConfiguration();
+    const activeLLM = config.active_llm || 'groq';
+    let llm;
 
-    if (!groqApiKey) {
-        throw new Error("Groq API Key is not configured in Master Settings or Environment Variables.");
+    if (activeLLM === 'bedrock') {
+        const { ChatBedrockConverse } = require("@langchain/aws");
+        const accessKeyId = await configService.getSecret("AWS_ACCESS_KEY_ID") || process.env.AWS_ACCESS_KEY_ID;
+        const secretAccessKey = await configService.getSecret("AWS_SECRET_ACCESS_KEY") || process.env.AWS_SECRET_ACCESS_KEY;
+        
+        if (!accessKeyId || !secretAccessKey) {
+            throw new Error("AWS Credentials are not configured in Master Settings or Environment Variables.");
+        }
+
+        llm = new ChatBedrockConverse({
+            model: "anthropic.claude-3-sonnet-20240229-v1:0",
+            region: process.env.AWS_REGION || "us-east-1",
+            credentials: { accessKeyId, secretAccessKey }
+        });
+    } else if (activeLLM === 'gemini') {
+        const { ChatGoogleGenerativeAI } = require("@langchain/google-genai");
+        const googleApiKey = await configService.getSecret("GOOGLE_API_KEY") || process.env.GOOGLE_API_KEY;
+        if (!googleApiKey) {
+            throw new Error("Google API Key is not configured.");
+        }
+        llm = new ChatGoogleGenerativeAI({
+            apiKey: googleApiKey,
+            modelName: "gemini-1.5-pro",
+            temperature: 0.2,
+        });
+    } else if (activeLLM === 'openai') {
+        const { ChatOpenAI } = require("@langchain/openai");
+        const openaiApiKey = await configService.getSecret("OPENAI_API_KEY") || process.env.OPENAI_API_KEY;
+        if (!openaiApiKey) {
+            throw new Error("OpenAI API Key is not configured.");
+        }
+        llm = new ChatOpenAI({
+            apiKey: openaiApiKey,
+            modelName: "gpt-4o",
+            temperature: 0.2,
+        });
+    } else {
+        const groqApiKey = await configService.getSecret("GROQ_API_KEY") || process.env.GROQ_API_KEY;
+        if (!groqApiKey) {
+            throw new Error("Groq API Key is not configured in Master Settings or Environment Variables.");
+        }
+        llm = new ChatGroq({
+            apiKey: groqApiKey,
+            modelName: "qwen/qwen3.6-27b", 
+            temperature: 0.2,
+        });
     }
-
-    const llm = new ChatGroq({
-        apiKey: groqApiKey,
-        modelName: "qwen/qwen3.6-27b", 
-        temperature: 0.2,
-    });
 
     const prompt = ChatPromptTemplate.fromMessages([
         [
@@ -185,6 +230,7 @@ async function initializeAgent() {
             "If the user is describing an emergency, ALWAYS use the emergency_escalation tool immediately. " +
             "IMPORTANT: When you successfully book an appointment using the book_appointment tool, you MUST read the Appointment ID back to the user and tell them to show it when they visit."
         ],
+        new MessagesPlaceholder("chat_history"),
         ["human", "{input}"],
         ["placeholder", "{agent_scratchpad}"],
     ]);
@@ -198,12 +244,32 @@ async function initializeAgent() {
     });
 }
 
-async function runAgent(transcript, intentName) {
+async function runAgent(sessionId, transcript, intentName) {
     try {
         const agentExecutor = await initializeAgent();
+        
+        // Retrieve or initialize chat history for this session
+        if (!sessionMemoryStore.has(sessionId)) {
+            sessionMemoryStore.set(sessionId, []);
+        }
+        const chatHistory = sessionMemoryStore.get(sessionId);
+
+        const inputStr = `User Intent: ${intentName}. Transcript: "${transcript}"`;
+        
         const result = await agentExecutor.invoke({
-            input: `User Intent: ${intentName}. Transcript: "${transcript}"`
+            input: inputStr,
+            chat_history: chatHistory
         });
+        
+        // Update memory
+        chatHistory.push(new HumanMessage(inputStr));
+        chatHistory.push(new AIMessage(result.output));
+        
+        // Keep only last 10 messages to avoid context window explosion
+        if (chatHistory.length > 20) {
+            chatHistory.splice(0, chatHistory.length - 20);
+        }
+
         return result.output;
     } catch (error) {
         console.error("LangChain Agent Error:", error);
@@ -211,6 +277,11 @@ async function runAgent(transcript, intentName) {
     }
 }
 
+function clearSession(sessionId) {
+    sessionMemoryStore.delete(sessionId);
+}
+
 module.exports = {
-    runAgent
+    runAgent,
+    clearSession
 };

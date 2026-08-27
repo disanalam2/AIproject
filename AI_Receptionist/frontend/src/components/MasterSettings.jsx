@@ -138,6 +138,7 @@ const MasterSettings = () => {
                             <label style={{ display: 'block', marginBottom: '0.5rem' }}>Builder / Orchestrator</label>
                             <select value={config.active_builder} onChange={e => handleConfigChange('active_builder', e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border)' }}>
                                 <option value="lex">Amazon Lex</option>
+                                <option value="dialogflow">Google Dialogflow</option>
                                 <option value="voiceflow">Voiceflow</option>
                                 <option value="twilio_studio">Twilio Studio</option>
                             </select>
