@@ -5,7 +5,7 @@ const { chromium } = require('playwright');
   const page = await browser.newPage();
   await page.goto('https://mhj-marketing.web.app/');
   
-  await page.fill('#staticrypt-password', 'MHJ@ADMIN@INTERN@DISANALAM');
+  await page.fill('#staticrypt-password', 'MHJ@ADMIN@INTERN@123');
   await page.click('input[type="submit"]');
   
   // wait for the content to decrypt and render

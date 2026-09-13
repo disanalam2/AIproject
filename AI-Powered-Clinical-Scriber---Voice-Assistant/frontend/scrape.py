@@ -5,7 +5,7 @@ def run():
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
         page.goto('https://mhj-marketing.web.app/')
-        page.fill('#staticrypt-password', 'MHJ@ADMIN@INTERN@DISANALAM')
+        page.fill('#staticrypt-password', 'MHJ@ADMIN@INTERN@123')
         page.click('input[type="submit"]')
         page.wait_for_timeout(2000)
         content = page.evaluate('document.body.innerText')
