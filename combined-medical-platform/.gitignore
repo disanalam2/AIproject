@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+/frontend/.next/
+/frontend/out/
+/frontend/build/
+/backend/dist/
+
+# Testing
+/frontend/coverage/
+/frontend/playwright-report/
+/frontend/test-results/
+
+# Editor / IDE / AI Tools
+.DS_Store
+.idea/
+.vscode/
+.claude/
+.windsurf/
+.agents/
+*.swp
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.log
+
+# Misc
+*.pem
+google-credentials.json

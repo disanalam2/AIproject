@@ -1,0 +1,48 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# Editor / IDE / AI Tools
+.DS_Store
+.idea/
+.vscode/
+.claude/
+.windsurf/
+.agents/
+*.swp
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# local env files
+.env*.local
+.env
+
+# Vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Google Cloud Service Account Keys
+google-credentials.json
+
+/src/generated/prisma

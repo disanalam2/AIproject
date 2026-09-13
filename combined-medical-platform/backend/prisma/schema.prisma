@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// Multi-Tenant Models
+// ==========================================
+
+model Tenant {
+  id            Int            @id @default(autoincrement())
+  name          String
+  domain        String?        @unique // Custom domain for the hospital
+  activeModules String?        // e.g. ["scriber", "receptionist"]
+  createdAt     DateTime       @default(now())
+  users         ClientUser[]
+  phones        TenantPhone[]
+  patients      Patient[]
+  appointments  Appointment[]
+  callLogs      CallLog[]
+  auditLogs     AuditLog[]
+  notes         Note[]
+  departments   Department[]
+  doctors       Doctor[]
+}
+
+model ClientUser {
+  id           Int      @id @default(autoincrement())
+  tenantId     Int
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+model TenantPhone {
+  id          Int      @id @default(autoincrement())
+  tenantId    Int
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  phoneNumber String   @unique // The inbound number assigned to this tenant (e.g. Twilio number)
+  createdAt   DateTime @default(now())
+}
+
+// ==========================================
+// AI Scriber Models
+// ==========================================
+
+model Patient {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String?
+  phone     String?  // The phone number used for login and appointments
+  createdAt DateTime @default(now())
+  notes     Note[]
+}
+
+model Note {
+  id               Int      @id @default(autoincrement())
+  tenantId         Int
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  patientId        Int?
+  patient          Patient? @relation(fields: [patientId], references: [id])
+  /// @encrypted
+  transcript       String   @db.Text
+  /// @encrypted
+  subjective       String?  @db.Text
+  /// @encrypted
+  objective        String?  @db.Text
+  /// @encrypted
+  assessment       String?  @db.Text
+  /// @encrypted
+  lifestyle_advice String?  @db.Text
+  /// @encrypted
+  medications      String?  @db.Text
+  /// @encrypted
+  billing_codes    String?  @db.Text
+  createdAt        DateTime @default(now())
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  tenantId   Int
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  action     String
+  entityType String
+  entityId   Int?
+  details    String?  @db.Text
+  createdAt  DateTime @default(now())
+}
+
+// ==========================================
+// AI Receptionist Models
+// ==========================================
+
+model Department {
+  id        Int      @id @default(autoincrement())
+  tenantId  Int
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  doctors   Doctor[]
+}
+
+model Doctor {
+  id               Int           @id @default(autoincrement())
+  tenantId         Int
+  tenant           Tenant        @relation(fields: [tenantId], references: [id])
+  departmentId     Int
+  department       Department    @relation(fields: [departmentId], references: [id])
+  name             String
+  email            String?
+  googleCalendarId String?       // Link to their specific google calendar
+  schedules        Schedule[]
+  appointments     Appointment[]
+}
+
+model Schedule {
+  id        Int      @id @default(autoincrement())
+  doctorId  Int
+  doctor    Doctor   @relation(fields: [doctorId], references: [id])
+  dayOfWeek String   // e.g. "Monday"
+  startTime String   // e.g. "09:00"
+  endTime   String   // e.g. "17:00"
+}
+
+model Appointment {
+  id              Int      @id @default(autoincrement())
+  tenantId        Int
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  doctorId        Int?
+  doctor          Doctor?  @relation(fields: [doctorId], references: [id])
+  patientName     String   /// @encrypted
+  patientPhone    String   /// @encrypted
+  appointmentDate DateTime
+  reason          String?  /// @encrypted
+  status          String   @default("CONFIRMED") // CONFIRMED, CANCELED, RESCHEDULED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model CallLog {
+  id                Int      @id @default(autoincrement())
+  tenantId          Int
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+  phoneNumber       String   /// @encrypted
+  transcript        String   @db.Text
+  extractedSymptoms String?  @db.Text
+  intent            String
+  duration          Int?     // in seconds
+  createdAt         DateTime @default(now())
+}
+
+// ==========================================
+// Global MHJ Company Config
+// ==========================================
+
+model Configuration {
+  key   String @id
+  value String
+}
+
+model Secret {
+  key   String @id
+  value String @db.Text /// @encrypted
+}
